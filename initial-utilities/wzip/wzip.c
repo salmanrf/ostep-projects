@@ -32,6 +32,11 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
+  if(n_file > 1) {
+    char ch = '\n';
+    fwrite(&ch, sizeof(char), 1, stdout);
+  }
+
   for(int i = 0; i < n_file; i++) {
     fclose(files[i]);
   }
@@ -68,15 +73,8 @@ int compress_rle(int n_file, FILE **fp, FILE *out) {
   }
 
   while((ch = getc_from_files(n_file, fp)) != EOF) {
-    // Reset counter on newline
-    if(last_ch == '\n') {
-	last_ch = ch;
-        n_ch = 1; 
-	continue;
-    }
-
     // Write upon end of consecutive characters, or newline
-    if(ch != last_ch || ch == '\n') {
+    if(ch != last_ch) {
       int n_written = fwrite(&n_ch, sizeof(int), 1, out);
       if(n_written == 0) {
         fprintf(stderr, "failed to write, terminating\n");
@@ -89,10 +87,6 @@ int compress_rle(int n_file, FILE **fp, FILE *out) {
 	return 1;
       }
 
-      if (ch == '\n') {
-        fwrite(&ch, sizeof(char), 1, out);
-      }
-
       n_ch = 1;
     } else {
       n_ch += 1;
@@ -103,19 +97,17 @@ int compress_rle(int n_file, FILE **fp, FILE *out) {
 
   int n_written = 0;
 
-  if(last_ch != '\n') {
-     n_written = fwrite(&n_ch, sizeof(int), 1, out);
-    if(n_written == 0) {
-      fprintf(stderr, "failed to write, terminating\n");
-      return 1;
-    }
+   n_written = fwrite(&n_ch, sizeof(int), 1, out);
+  if(n_written == 0) {
+    fprintf(stderr, "failed to write, terminating\n");
+    return 1;
   }
-
+    
   n_written = fwrite(&last_ch, sizeof(char), 1, out);
   if(n_written == 0) {
     fprintf(stderr, "failed to write, terminating\n");
     return 1;
   }
-   
+     
   return 0; 
 }
