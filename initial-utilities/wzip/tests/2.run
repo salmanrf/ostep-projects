@@ -1,2 +1,1 @@
-./wzip tests/1.in tests/1.in tests/1.in
-
+./wzip tests/1.in tests/1.in tests/1.in 
