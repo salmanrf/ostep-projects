@@ -1,21 +1,19 @@
 OPTS = -Wall -g 
-OBJS = *.o
+OBJS = wish.o common.o exec.o
 
-wish: wish.o common.o exec.o
-	gcc -o wish common.o exec.o wish.o
+wish: $(OBJS)
+	gcc $(OPTS) -o wish $(OBJS)
 
-wish.o: wish.c common.o exec.o 
-	gcc -o wish.o $(OPTS) -c wish.c 
+wish.o: wish.c
+	gcc $(OPTS) -c wish.c
 
-exec.o: common.o exec.c 
-	gcc -o exec.o $(OPTS) -c exec.c
+exec.o: exec.c
+	gcc $(OPTS) -c exec.c
 
 common.o: common.c
-	gcc -o common.o $(OPTS) -c common.c
+	gcc $(OPTS) -c common.c
 
 all: wish
 
 clean: 
-	rm wish $(OBJS)
-
-
+	rm -f wish $(OBJS)
