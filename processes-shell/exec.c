@@ -4,57 +4,57 @@
 #include "common.h"
 #include "exec.h"
 
-void run_exit(char *cmd, int argc, LIST_NODE *args) {
-    if(argc > 0) {
-        print_err(cmd, "too many arguments");
+void run_exit(ARGS *args) {
+    if(args->argc > 0) {
+        print_err(args->cmd, "too many arguments");
         exit(1);
     }        
     exit(0);
 }
 
-int run_cd(char *cmd, int argc, LIST_NODE *args) {
-    if(argc == 0) {
+int run_cd(ARGS *args) {
+    if(args->argc == 0) {
         return 0;
     }
 
-    if(argc > 1) {
-        print_err(cmd, "too many arguments");
+    if(args->argc > 1) {
+        print_err(args->cmd, "too many arguments");
         return 1;
     }
 
-    char *path = (char *) args->data;
+    char *path = (char *) args->args->data;
     int ret = chdir(path);
     if(ret != 0) {
-        char *errmsg = ": No such file or directory";
-        print_err(cmd, strcat(path, errmsg));
+        char *msg = ": No such file or directory";
+        int len = strlen(path) + strlen(msg);
+        char *errmsg = (char *) malloc(len);
+        snprintf(errmsg, len, "%s%s", (char *) path, msg);
+        print_err(args->cmd, errmsg);
         return ret;
     }
 
     return 0;
 }
 
-int run_path(LIST_NODE **dest, char *cmd, int argc, LIST_NODE *args) {
-    if(argc == 0) {
+int run_path(LIST_NODE **dest, ARGS *args) {
+    if(args->argc == 0) {
         *dest = NULL;
     }
 
     LIST_NODE *new_paths = NULL; 
-    LIST_NODE *node = args;
-    LIST_NODE *curr_cp = NULL;
+    LIST_NODE *node = args->args;
     while(node != NULL) {
         LIST_NODE *arg = (LIST_NODE *) malloc(sizeof(LIST_NODE));
         arg->data = node->data;
-        arg->next = node->next;
+        arg->next = NULL;
 
         if(new_paths == NULL) {
             new_paths = arg;
-            curr_cp = arg;
         } else {
-            curr_cp->next = arg;
+            new_paths->next = arg;
         }
 
         node = node->next;
-        curr_cp = arg;
     }
 
     *dest = new_paths;
@@ -62,10 +62,11 @@ int run_path(LIST_NODE **dest, char *cmd, int argc, LIST_NODE *args) {
     return 0;
 }
 
-int run_proc(LIST_NODE *PATHS, char *cmd, int argc, LIST_NODE *args) {
+int run_proc(LIST_NODE *PATHS, ARGS *args) {
     LIST_NODE *path = PATHS;
 
     int ok = -1;
+    char *cmd = args->cmd;
     char *COMMAND = NULL;
     while(path != NULL && ok != 0) {
         int len = 2 + strlen((char *) path->data) + strlen(cmd);
@@ -84,10 +85,10 @@ int run_proc(LIST_NODE *PATHS, char *cmd, int argc, LIST_NODE *args) {
 
     int pid = fork();
     if(pid == 0) {
-        int newargc = argc + 1;
+        int newargc = args->argc + 1;
         char *argv[newargc];
         argv[0] = COMMAND;
-        LIST_NODE *arg = args;
+        LIST_NODE *arg = args->args;
         for(int i = 1; i < newargc; i++) {
             argv[i] = (char *) arg->data;
             arg = arg->next;

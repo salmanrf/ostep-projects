@@ -5,12 +5,12 @@
 
 #define BASE_EXECUTABLE "/bin"
 
-int run_cd(char *cmd, int argc, LIST_NODE *args);
+int run_cd(ARGS *args);
 
-int run_path(LIST_NODE **PATHS, char *cmd, int argc, LIST_NODE *args);
+int run_path(LIST_NODE **PATHS, ARGS *args);
 
-int run_proc(LIST_NODE *PATHS, char *cmd, int argc, LIST_NODE *args);
+int run_proc(LIST_NODE *PATHS, ARGS *args);
 
-void run_exit(char *cmd, int argc, LIST_NODE *args);
+void run_exit(ARGS *args);
 
 #endif
