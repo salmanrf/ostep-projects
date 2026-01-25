@@ -18,26 +18,16 @@ int start_interactive() {
 	size_t size = 0;
     ssize_t nread = 0;
 
-    int ret = 0;
-
     LIST_NODE *PATHS = (LIST_NODE *) malloc(sizeof(LIST_NODE));
     PATHS->data = BASE_EXECUTABLE;
     PATHS->next = NULL;
 
 	do {
 		if(line != NULL) {
-            ret = run_line(&PATHS, line, nread);
-        }
-
-        if(ret != 0) {
-            break;
-        } else {
-            printf("wish> ");
-        }
-
+            run_line(&PATHS, line, nread);
+        } 
+        printf("wish> ");
 	} while((nread = getline(&line, &size, stdin)) != EOF);
-
-    free(line);
 
 	return 0;
 }
@@ -48,52 +38,21 @@ int run_line(LIST_NODE **PATHS, char *input, ssize_t len) {
     }
 
     char *prompt = strdup(input);
-
-    if(prompt[len - 1] == '\n') {
-        prompt[len - 1] = '\0';
-    }
-
-    char *cmd = NULL;
-    if(!(cmd = strsep(&prompt, " "))) {
-        return 0;     
-    }
-
-    LIST_NODE *args = NULL;
-    int argc = 0;
-    char *token = NULL;
-
-    LIST_NODE *node = NULL;
-    while((token = strsep(&prompt, " "))) {
-        if(strcmp(token, " ") == 0) {
-            continue;
-        }
-
-        LIST_NODE *arg = (LIST_NODE *) malloc(sizeof(LIST_NODE));
-        arg->data = strdup(token);
-        arg->next = NULL;
-
-        if(args == NULL) {
-            args = arg;
-        } else {
-            node->next = arg;
-        }
-
-        node = arg;
-
-        argc += 1;
-    }
+    ARGS *args = build_args(prompt, len);
+    char *cmd = args->cmd;
 
     int ret = 0;
     if(strcmp(cmd, "exit") == 0) {
-        run_exit(cmd, argc, args);
+        run_exit(args);
     } else if(strcmp(cmd, "cd") == 0) {
-        ret = run_cd(cmd, argc, args);
+        ret = run_cd(args);
     } else if(strcmp(cmd, "path") == 0) {
-        ret = run_path(PATHS, cmd, argc, args);
+        ret = run_path(PATHS, args);
     } else {
-        ret = run_proc(*PATHS, cmd, argc, args);
+        ret = run_proc(*PATHS, args);
     }
 
-    free_ll(&args);
+    free_ll(&args->args);
+    free(args);
     return ret;
 }
