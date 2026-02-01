@@ -4,6 +4,56 @@
 #include "common.h"
 #include "exec.h"
 
+int run_all(PROGS *progs, LIST_NODE **PATHS) {
+    LIST_NODE *prompts = progs->prompts;
+    int progc = progs->progc;
+    LIST_NODE *node = prompts;
+    int progi = 0;
+    int pids[progc];
+    while(node != NULL) {
+        char *prompt = (char *) node->data;
+        ARGS *args = build_args(prompt, strlen(prompt));
+        if(args == NULL) {
+            node = node->next;
+            continue;
+        }
+        char *cmd = args->cmd;
+
+        int pid = 0;
+        
+        if(strcmp(cmd, "exit") == 0) {
+            run_exit(args);
+        } else if(strcmp(cmd, "cd") == 0) {
+            run_cd(args);
+        } else if(strcmp(cmd, "path") == 0) {
+            run_path(PATHS, args);
+        } else {
+            pid = run_proc(*PATHS, args);
+        }
+
+        pids[progi] = pid;
+        progi += 1;
+
+        free_ll(&args->args);
+        free(args);
+
+        node = node->next;
+    }
+    for(int i = 0; i < progc; i++) {
+        if(pids[i] == 0) {
+            continue;
+        }
+
+        int stat;
+        waitpid(pids[i], &stat, WUNTRACED);
+        if(stat != 0) {
+            printf("forked process %d failed with status %d\n", pids[i], stat);
+        }
+    }
+
+    return 0;
+}
+
 void run_exit(ARGS *args) {
     if(args->argc > 0) {
         print_err(args->cmd, "too many arguments");
@@ -96,8 +146,7 @@ int run_proc(LIST_NODE *PATHS, ARGS *args) {
         argv[newargc] = NULL; 
         execv(COMMAND, argv);
     } else {
-        wait(NULL);
-        free(COMMAND);
+        return pid;
     }
 
     return 0;

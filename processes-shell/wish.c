@@ -38,21 +38,9 @@ int run_line(LIST_NODE **PATHS, char *input, ssize_t len) {
     }
 
     char *prompt = strdup(input);
-    ARGS *args = build_args(prompt, len);
-    char *cmd = args->cmd;
+    PROGS *progs = build_progs(prompt, len);
 
-    int ret = 0;
-    if(strcmp(cmd, "exit") == 0) {
-        run_exit(args);
-    } else if(strcmp(cmd, "cd") == 0) {
-        ret = run_cd(args);
-    } else if(strcmp(cmd, "path") == 0) {
-        ret = run_path(PATHS, args);
-    } else {
-        ret = run_proc(*PATHS, args);
-    }
+    int ret = run_all(progs, PATHS);
 
-    free_ll(&args->args);
-    free(args);
     return ret;
 }

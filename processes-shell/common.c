@@ -1,6 +1,47 @@
 #include <stdlib.h>
 #include "common.h"
 
+PROGS *build_progs(char *main_prompt, ssize_t len) {
+    char *prompt = strdup(main_prompt);
+
+    if(prompt[len - 1] == '\n') {
+        prompt[len - 1] = '\0';
+    }
+
+    LIST_NODE *prompts = NULL;
+    int progc = 0;
+    char *token = NULL;
+
+    LIST_NODE *node = NULL;
+    while((token = strsep(&prompt, "&"))) {
+        int len = strlen(token);
+        token = str_trim_left(token, &len);
+        if(!token || strlen(token) == 0) {
+            continue;
+        }
+
+        LIST_NODE *prog = (LIST_NODE *) malloc(sizeof(LIST_NODE));
+        prog ->data = strdup(token);
+        prog ->next = NULL;
+
+        if(prompts == NULL) {
+            prompts = prog;
+        } else {
+            node->next = prog;
+        }
+
+        node = prog;
+        progc += 1;
+    }
+
+    PROGS *ret = (PROGS *) malloc(sizeof(PROGS));
+    ret->prompts = prompts;
+    ret->progc = progc;
+
+    return ret;
+
+}
+
 ARGS *build_args(char *input, ssize_t len) {
     char *prompt = strdup(input);
 
@@ -9,8 +50,8 @@ ARGS *build_args(char *input, ssize_t len) {
     }
 
     char *cmd = NULL;
-    if(!(cmd = strsep(&prompt, " "))) {
-        return 0;     
+    if(!(cmd = strsep(&prompt, " ")) || strlen(cmd) == 0) {
+        return NULL;     
     }
 
     LIST_NODE *args = NULL;
@@ -66,4 +107,30 @@ void print_ll_string(LIST_NODE *ll) {
 
 void print_err(char *cmd, char *errmsg) {
     printf("wish: %s: %s\n", cmd, errmsg);
+}
+
+char *str_trim_left(char *str, int *len) {
+    int oldlen = *len;
+    int start = 0;
+
+    while(str[start] == ' ' || str[start] == '\t') {
+        start += 1;
+    }
+
+    if(start == 0) {
+        return str;
+    }
+
+    int newlen = (oldlen - start) + 1;
+
+    char *newstr = malloc(newlen);
+    int i = 0;
+    for(; i < newlen; i++) {
+        int orig_i = start + i;
+        newstr[i] = str[orig_i];
+    }
+    newstr[i] = '\0';
+    *len = newlen;
+
+    return newstr;
 }
