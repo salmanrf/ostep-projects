@@ -99,7 +99,7 @@ void free_ll(LIST_NODE **ll) {
 void print_ll_string(LIST_NODE *ll) {
     LIST_NODE *node = ll;
     while(node != NULL) {
-        printf("%s", (char *) node->data);
+        printf("(%s) -> ", (char *) node->data);
         node = node->next;
     }
     printf("\n");
