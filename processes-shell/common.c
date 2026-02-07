@@ -109,6 +109,11 @@ void print_err(char *cmd, char *errmsg) {
     printf("wish: %s: %s\n", cmd, errmsg);
 }
 
+void print_generic_err() {
+    char error_message[30] = "An error has occurred\n";
+    write(STDERR_FILENO, error_message, strlen(error_message));
+}
+
 char *str_trim_left(char *str, int *len) {
     int oldlen = *len;
     int start = 0;

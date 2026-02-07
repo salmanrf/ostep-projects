@@ -30,6 +30,8 @@ void print_ll_string(LIST_NODE *ll);
 
 void print_err(char *cmd, char *errmsg);
 
+void print_generic_err();
+
 PROGS *build_progs(char *main_prompt, ssize_t len);
 
 ARGS *build_args(char *input, ssize_t len);
