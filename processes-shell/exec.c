@@ -46,9 +46,9 @@ int run_all(PROGS *progs, LIST_NODE **PATHS) {
 
         int stat;
         waitpid(pids[i], &stat, WUNTRACED);
-        if(stat != 0) {
-            printf("forked process %d failed with status %d\n", pids[i], stat);
-        }
+//        if(stat != 0) {
+//            print_generic_err();
+//        }
     }
 
     return 0;
@@ -56,30 +56,22 @@ int run_all(PROGS *progs, LIST_NODE **PATHS) {
 
 void run_exit(ARGS *args) {
     if(args->argc > 0) {
-        print_err(args->cmd, "too many arguments");
-        exit(1);
+        print_generic_err();
+        exit(0);
     }        
     exit(0);
 }
 
 int run_cd(ARGS *args) {
-    if(args->argc == 0) {
-        return 0;
-    }
-
-    if(args->argc > 1) {
-        print_err(args->cmd, "too many arguments");
+    if(args->argc != 1) {
+        print_generic_err();
         return 1;
     }
 
     char *path = (char *) args->args->data;
     int ret = chdir(path);
     if(ret != 0) {
-        char *msg = ": No such file or directory";
-        int len = strlen(path) + strlen(msg);
-        char *errmsg = (char *) malloc(len);
-        snprintf(errmsg, len, "%s%s", (char *) path, msg);
-        print_err(args->cmd, errmsg);
+        print_generic_err();
         return ret;
     }
 
@@ -128,7 +120,7 @@ int run_proc(LIST_NODE *PATHS, ARGS *args) {
     }
 
     if(ok != 0) {
-        print_err(cmd, "command not found");
+        print_generic_err();
         free(COMMAND);
         return 0;
     }
