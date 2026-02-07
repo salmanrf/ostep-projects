@@ -47,7 +47,7 @@ int start_interactive(LIST_NODE **PATHS) {
 	char *line = NULL;
 	size_t size = 0;
     ssize_t nread = 0;
- 
+
 	do {
 		if(line != NULL) {
             run_line(PATHS, line, nread);

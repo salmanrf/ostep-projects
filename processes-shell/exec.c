@@ -20,7 +20,9 @@ int run_all(PROGS *progs, LIST_NODE **PATHS) {
         char *cmd = args->cmd;
 
         int pid = 0;
-        
+
+//        print_ll_string(args->args);
+
         if(strcmp(cmd, "exit") == 0) {
             run_exit(args);
         } else if(strcmp(cmd, "cd") == 0) {
@@ -40,15 +42,25 @@ int run_all(PROGS *progs, LIST_NODE **PATHS) {
         node = node->next;
     }
     for(int i = 0; i < progc; i++) {
-        if(pids[i] == 0) {
+        int pid = pids[i];
+
+ //       printf("pid: %d\n", pid);
+
+        if(pid == 0) {
+            continue;
+        }
+
+        if(pid < 0) {
+            print_generic_err();
             continue;
         }
 
         int stat;
-        waitpid(pids[i], &stat, WUNTRACED);
-//        if(stat != 0) {
-//            print_generic_err();
-//        }
+        waitpid(pid, &stat, WUNTRACED);
+//        printf("process returned %d\n", stat);
+        if(stat < 0) {
+            print_generic_err();
+        }
     }
 
     return 0;
@@ -109,6 +121,7 @@ int run_proc(LIST_NODE *PATHS, ARGS *args) {
 
     int ok = -1;
     char *cmd = args->cmd;
+    LIST_NODE *nextarg = args->args;
     char *COMMAND = NULL;
     while(path != NULL && ok != 0) {
         int len = 2 + strlen((char *) path->data) + strlen(cmd);
@@ -125,17 +138,37 @@ int run_proc(LIST_NODE *PATHS, ARGS *args) {
         return 0;
     }
 
+    int newargc = args->argc + 1;
+    int lastarg_i = newargc - 1;
+    char *argv[newargc + 1];
+    argv[0] = COMMAND;
+    char *stdout_path = NULL;
+    for(int i = 1; i < newargc; i++) {
+        char *argx = (char *) nextarg->data;
+        if(strcmp(argx, ">") == 0) {
+            if(i == lastarg_i || (lastarg_i - i) > 1) {
+                return -1;
+            }
+
+            stdout_path = (char *) nextarg->next->data;
+            argv[i] = NULL;
+            break;
+        }
+
+        argv[i] = argx;
+        nextarg = nextarg->next;
+    }
+    argv[newargc] = NULL; 
+
     int pid = fork();
     if(pid == 0) {
-        int newargc = args->argc + 1;
-        char *argv[newargc];
-        argv[0] = COMMAND;
-        LIST_NODE *arg = args->args;
-        for(int i = 1; i < newargc; i++) {
-            argv[i] = (char *) arg->data;
-            arg = arg->next;
+        if(stdout_path != NULL) {
+            close(STDOUT_FILENO);
+            FILE *newstdout = fopen(stdout_path, "w+");
+            if(newstdout == NULL) {
+                return 1;
+            }
         }
-        argv[newargc] = NULL; 
         execv(COMMAND, argv);
     } else {
         return pid;
