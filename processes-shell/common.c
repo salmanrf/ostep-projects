@@ -1,7 +1,7 @@
 #include <stdlib.h>
 #include "common.h"
 
-PROGS *build_progs(char *main_prompt, ssize_t len) {
+PROGS *build_progs(char *main_prompt, size_t len) {
     char *prompt = strdup(main_prompt);
 
     if(prompt[len - 1] == '\n') {
@@ -14,7 +14,7 @@ PROGS *build_progs(char *main_prompt, ssize_t len) {
 
     LIST_NODE *node = NULL;
     while((token = strsep(&prompt, "&"))) {
-        int len = strlen(token);
+        size_t len = strlen(token);
         token = str_trim_left(token, &len);
         if(!token || strlen(token) == 0) {
             continue;
@@ -42,23 +42,45 @@ PROGS *build_progs(char *main_prompt, ssize_t len) {
 
 }
 
-ARGS *build_args(char *input, ssize_t len) {
+ARGS *build_args(char *input, size_t len) {
     char *prompt = strdup(input);
 
     if(prompt[len - 1] == '\n') {
         prompt[len - 1] = '\0';
     }
 
-    char *cmd = NULL;
-    if(!(cmd = strsep(&prompt, " ")) || strlen(cmd) == 0) {
-        return NULL;     
-    }
-
+    ARGS *ret = (ARGS *) malloc(sizeof(ARGS));
+    ret->cmd = "";
+    ret->args = NULL;
+    ret->argc = 0;
     LIST_NODE *args = NULL;
+    LIST_NODE *node = NULL;
     int argc = 0;
     char *token = NULL;
+    char *output_path = NULL;
+    size_t initial_len = strlen(prompt);
 
-    LIST_NODE *node = NULL;
+    token = strsep(&prompt, ">");
+    if(strlen(token) < initial_len && prompt != NULL) {
+        size_t newlen = strlen(prompt);
+        output_path = str_trim_left(prompt, &newlen);
+        if(newlen > 0) {
+            char *tkn = strsep(&output_path, " ");
+            if(strlen(tkn) < newlen) {
+                output_path = "";
+            } else {
+                output_path = tkn;
+            }
+        }
+    } 
+    prompt = token;
+    token = NULL;
+
+    char *cmd = NULL;
+    if(!(cmd = strsep(&prompt, " ")) || strlen(cmd) == 0) {
+        return ret;     
+    }
+
     while((token = strsep(&prompt, " "))) {
         if(!token || strlen(token) == 0) {
             continue;
@@ -78,10 +100,10 @@ ARGS *build_args(char *input, ssize_t len) {
         argc += 1;
     }
 
-    ARGS *ret = (ARGS *) malloc(sizeof(ARGS));
     ret->cmd = cmd;
     ret->args = args;
     ret->argc = argc;
+    ret->output_path = output_path;
 
     return ret;
 }
@@ -114,7 +136,11 @@ void print_generic_err() {
     write(STDERR_FILENO, error_message, strlen(error_message));
 }
 
-char *str_trim_left(char *str, int *len) {
+char *str_trim_left(char *str, size_t *len) {
+    if(str == NULL) {
+        return str;
+    }
+ 
     int oldlen = *len;
     int start = 0;
 
