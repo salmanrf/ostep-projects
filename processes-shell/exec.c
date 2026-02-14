@@ -20,10 +20,12 @@ int run_all(PROGS *progs, LIST_NODE **PATHS) {
         char *cmd = args->cmd;
 
         int pid = 0;
-
+        
 //        print_ll_string(args->args);
 
-        if(strcmp(cmd, "exit") == 0) {
+        if(!args->valid_redir) {
+            pid = -1;
+        } else if(strcmp(cmd, "exit") == 0) {
             run_exit(args);
         } else if(strcmp(cmd, "cd") == 0) {
             run_cd(args);
@@ -148,16 +150,13 @@ int run_proc(LIST_NODE *PATHS, ARGS *args) {
     }
     argv[newargc] = NULL; 
 
-    char *output_path = args->output_path;
-    if(output_path != NULL && strlen(output_path) == 0) {
-        return -1;
-    }
+    char *redir_path = args->redir_path;
 
     int pid = fork();
     if(pid == 0) {
-        if(output_path != NULL) {
+        if(redir_path != NULL) {
             close(STDOUT_FILENO);
-            FILE *newstdout = fopen(output_path, "w+");
+            FILE *newstdout = fopen(redir_path, "w+");
             if(newstdout == NULL) {
                 return -1;
             }
