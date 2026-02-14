@@ -1,3 +1,4 @@
+A collection of my own solutions to the projects of Operating Systems: Three Easy Pieces
 
 # Projects for an Operating Systems Class
 
