@@ -13,17 +13,19 @@ int run_all(PROGS *progs, LIST_NODE **PATHS) {
     while(node != NULL) {
         char *prompt = (char *) node->data;
         ARGS *args = build_args(prompt, strlen(prompt));
-        if(args == NULL) {
+        if(strlen(args->cmd) == 0) {
             node = node->next;
             continue;
         }
         char *cmd = args->cmd;
 
         int pid = 0;
-
+        
 //        print_ll_string(args->args);
 
-        if(strcmp(cmd, "exit") == 0) {
+        if(!args->valid_redir) {
+            pid = -1;
+        } else if(strcmp(cmd, "exit") == 0) {
             run_exit(args);
         } else if(strcmp(cmd, "cd") == 0) {
             run_cd(args);
@@ -139,34 +141,24 @@ int run_proc(LIST_NODE *PATHS, ARGS *args) {
     }
 
     int newargc = args->argc + 1;
-    int lastarg_i = newargc - 1;
     char *argv[newargc + 1];
     argv[0] = COMMAND;
-    char *stdout_path = NULL;
     for(int i = 1; i < newargc; i++) {
         char *argx = (char *) nextarg->data;
-        if(strcmp(argx, ">") == 0) {
-            if(i == lastarg_i || (lastarg_i - i) > 1) {
-                return -1;
-            }
-
-            stdout_path = (char *) nextarg->next->data;
-            argv[i] = NULL;
-            break;
-        }
-
         argv[i] = argx;
         nextarg = nextarg->next;
     }
     argv[newargc] = NULL; 
 
+    char *redir_path = args->redir_path;
+
     int pid = fork();
     if(pid == 0) {
-        if(stdout_path != NULL) {
+        if(redir_path != NULL) {
             close(STDOUT_FILENO);
-            FILE *newstdout = fopen(stdout_path, "w+");
+            FILE *newstdout = fopen(redir_path, "w+");
             if(newstdout == NULL) {
-                return 1;
+                return -1;
             }
         }
         execv(COMMAND, argv);
