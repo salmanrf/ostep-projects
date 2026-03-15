@@ -1,7 +1,12 @@
 #include "common.h"
 #define ACCEPT_BUF_SIZE
 
-int main(void) {
+int main(int argc, char **argv) {
+    if(argc < 2) {
+        fprintf(stderr, "usage: client <requested_file_path>\n");
+        exit(1);
+    }
+
     int sock_fd;
     struct addrinfo hints, *servinfo;
 
@@ -36,15 +41,22 @@ int main(void) {
         fprintf(stderr, "client: unable to connect\n");
         exit(1);
     }
+    
+    char *path = argv[1];
+    size_t path_len = strlen(argv[1]);
+    if(send(sock_fd, path, path_len, 0) < path_len) {
+        fprintf(stderr, "Failed to request open: Incomplete write\n");
+    }
 
     char buff[100];
-    while(1) {
-       int received = recv(sock_fd, buff, 100, 0);
-       if(received > 0 && received < 100) {
+    int received;
+    while((received = recv(sock_fd, buff, 100, 0)) > 0) {
+        if(received > 0 && received < 100) {
            buff[received] = '\0';
            printf("RECEIVED: '%s' from server\n", buff);
-       }
+        }
     }
+    printf("server closed the connection\n");
     
     close(sock_fd);
 

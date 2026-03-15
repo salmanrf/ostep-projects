@@ -1,0 +1,27 @@
+state: main: 3 clients = 0, client_fd = 0, max_fd = 3 + 1 = 4
+
+1. listens -> client joins
+    add to active_sockets
+    clients = 1, client_fd = 4, max_fd += 1 -> max_fd = 5
+
+2. listens -> client joins
+    add to active_sockets
+    clients = 2, client_fd = 5, max_fd += 1 -> max_fd = 6
+
+3. listens -> client joins
+    add to active_sockets
+    clients = 3, client_fd = 6, max_fd += 1 -> max_fd = 7 
+
+4. listens -> client disconnects
+    remove from active_sockets
+    clients = 2, client_fd = 6, max_fd == max_fd -> max_fd = 7
+
+5. listens:
+    initialize listen fd 3
+    for each clients:
+        if in active sockets:
+            add to listen sockets
+
+
+
+

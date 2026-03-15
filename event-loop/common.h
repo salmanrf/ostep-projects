@@ -9,6 +9,7 @@
 #include <netdb.h>
 #include <time.h>
 #include <unistd.h>
+#include <fcntl.h>
 
 #define SERVER_BACKLOG 10
 #define SERVICE "8080"
