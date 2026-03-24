@@ -42,6 +42,8 @@ int main(int argc, char **argv) {
         exit(1);
     }
     
+    printf("Connected to the server\n");
+
     char *path = argv[1];
     size_t path_len = strlen(argv[1]);
     if(send(sock_fd, path, path_len, 0) < path_len) {

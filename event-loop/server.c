@@ -72,57 +72,73 @@ int start_server() {
 
     printf("Server is ready to accept connections, listening on :%s\n", SERVICE);
 
+    int curr_numfds = 1 + INIT_POLLFDS_SIZE;
+    short events = POLLIN;
+    struct pollfd *pollfds = build_pollfds(curr_numfds, sock_fd, events);
+
     int client_fd;
-    fd_set listen_fds, active_fds;
 
     struct sockaddr client_addr;
     int addrsize = sizeof client_addr; 
-    struct timeval conn_timeout; 
-    conn_timeout.tv_sec = 10; 
-    conn_timeout.tv_usec = 0;
 
-    int max_fd = client_fd = sock_fd + 1;
+    pollfds[0].fd = sock_fd;
+    pollfds[0].events = events;
 
     while(1) {
-        FD_ZERO(&listen_fds);
-        FD_SET(sock_fd, &listen_fds);
-        for(int i = sock_fd + 1; i < max_fd; i++) {
-            if(!FD_ISSET(i, &active_fds)) {
-                continue;
-            }
-            FD_SET(i, &listen_fds);
-        }
-        int rc = select(client_fd + 1, &listen_fds, NULL, NULL, &conn_timeout);
-
-        conn_timeout.tv_sec = 10;
-
-        if(FD_ISSET(sock_fd, &listen_fds)) {
-            if((client_fd = accept(sock_fd, &client_addr, &addrsize)) < 0) {
-                perror("accept error");
-                return 1;
-            }
-
-            printf("Client connected\n");
-
-            FD_SET(client_fd, &active_fds);
-            handle_connected(client_fd);
+        int stat = poll(pollfds, curr_numfds, POLL_TIMEOUT_MS);
+        if(stat < 0) {
+            perror("poll: ");
+            exit(1);
         }
 
-        max_fd = client_fd + 1;
-        
-        for(int i = sock_fd + 1; i < max_fd + 1; i++) {
-            if(!FD_ISSET(i, &listen_fds)) {
-                continue;
+        if(stat == 0) {
+            printf("Timeout reached without events\n");
+            continue;
+        }
+
+        printf("Ready: %d\n", stat);
+
+        int processed = 0;
+        for(int i = 0; i < curr_numfds; i++) {
+            if(processed >= stat) {
+                break;
             }
 
-            if(handle_received_from_client(i) == 0) {
-                printf("Client disconnected\n");
-                if(i == client_fd) {
-                    printf("Most recent client disconnected\n");
-                    client_fd -= 1;
+            struct pollfd *pfd = &pollfds[i]; 
+            if(pfd->revents & POLLHUP) {
+                printf("FD not opened!\n");
+                pfd->fd = -1 * abs(pfd->fd);
+                processed += 1;
+            }
+
+            if(pfd->revents & POLLIN) {
+                if(pfd->fd == sock_fd) {
+                    if(client_fd + 1 >= curr_numfds) {
+                        processed += 1;
+                        continue;
+                    }
+                    if((client_fd = accept(sock_fd, &client_addr, &addrsize)) < 0) {
+                        perror("accept: ");
+                        processed += 1;
+                        break;
+                    }
+
+                    printf("New connection has been opened\n"); 
+
+                    struct pollfd *client = &pollfds[client_fd - sock_fd];
+                    client->fd = abs(client->fd);
+                    processed += 1;
                     continue;
                 }
-                FD_CLR(i, &active_fds);
+                
+                printf("Client ready to read!\n");
+                if(handle_received_from_client(pfd->fd) == 0) {
+                    printf("Remove client\n");
+                    close(pfd->fd);
+                    pfd->fd = -1 * abs(pfd->fd);
+                } 
+
+                processed += 1;
             }
         }
     }

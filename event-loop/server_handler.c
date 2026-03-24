@@ -49,7 +49,7 @@ int handle_received_from_client(int client_fd) {
         int fd = open(path, O_RDONLY, 0);
         if(fd < 0) {
             perror("open error");
-            return -1; 
+            return 0; 
         }
 
         char rdbuff[100];
@@ -63,9 +63,19 @@ int handle_received_from_client(int client_fd) {
             }
         }
 
-        close(fd);
-        return 1;
+        return 0;
     }
 
     return 0;
+}
+
+struct pollfd *build_pollfds(int numfds, int startfd, short events) {
+    struct pollfd *pollfds = calloc(numfds, sizeof(struct pollfd));
+
+    for(int i = 0; i < numfds; i++) {
+        pollfds[i].fd = -1 * (startfd + i);
+        pollfds[i].events = events;
+    }
+
+    return pollfds;
 }
