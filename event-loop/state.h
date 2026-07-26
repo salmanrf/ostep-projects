@@ -2,7 +2,7 @@
 
 typedef enum {
     WAITING_INPUT = 1,
-    WAITING_READ = 2,
+    PROCESSING = 2,
     WAITING_WRITE = 3
 } EREQ_STATUS;
 
@@ -22,6 +22,7 @@ typedef struct REQ_STATE {
 typedef struct {
     int size;
     REQ_STATE **store;
+    int current_n_conns;
 } STATE_STORE;
 
 STATE_STORE *init_state_store(int size);

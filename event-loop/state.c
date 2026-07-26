@@ -3,12 +3,13 @@
 STATE_STORE *init_state_store(int size) {
     STATE_STORE *ss = malloc(sizeof(STATE_STORE));
     REQ_STATE **store = (REQ_STATE **) malloc(sizeof(REQ_STATE *) * size);
-   
+
     ss->size = size;
     ss->store = store;
+    ss->current_n_conns = 0;
 
     for(int i = 0 ; i < size; i++) {
-       ss->store[0] = NULL; 
+        ss->store[0] = NULL; 
     }
 
     return ss;

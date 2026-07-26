@@ -1,43 +1,63 @@
 #include "server.h"
 
-void handle_conn(int client_fd, struct sockaddr *client_addr, int addrsize) {
-    time_t rawtime;
-    struct tm *timeinfo;
-    char datestr[100];
+EEvents get_event(STATE_STORE *store, int server_fd, struct pollfd *fd) {
+    if(fd == NULL) {
+        return -1;
+    }
+    
+    if(fd->revents & POLLHUP) {
+        return DISCONNECTED;
+    }
 
-    time(&rawtime);
-    timeinfo = localtime(&rawtime);
-
-    strftime(datestr, sizeof(datestr), "%Y-%m-%d %H:%M:%S", timeinfo);
-    printf("Formatted date string: %s\n", datestr);
-
-    if(send(client_fd, datestr, strlen(datestr), 0) < 0) {
-        perror("send error");
-        close(client_fd);
-    } 
-
-    close(client_fd);
+    if(fd->revents & POLLIN) {
+        if(server_fd == fd->fd) {
+            return NEW_CONNECTION;
+        }
+        
+        REQ_STATE *state = get_state(store, fd->fd);
+        if(state->type == STATE_CLIENT) {
+            return CLIENT_IN_READY;
+        } 
+        if(state->type == STATE_ASSET) {
+            return ASSET_IN_READY;
+        }
+    }
+    
+    return EMPTY;
 }
 
-void handle_connected(int client_fd) {
-    time_t rawtime;
-    struct tm *timeinfo;
-    char datestr[100];
+int handle_new_connection(STATE_STORE *store, struct pollfd *_, struct pollfd *pfd) {
+    if(store->current_n_conns + 1 > MAX_CONNECTION) {
+        pfd->fd = -1 * abs(pfd->fd);
+        return -1;
+    }
 
-    time(&rawtime);
-    timeinfo = localtime(&rawtime);
+    struct pollfd *server = pfd;
+    int client_fd;
+    struct sockaddr client_addr;
+    socklen_t addrsize = sizeof client_addr; 
+    if((client_fd = accept(server->fd, &client_addr, &addrsize)) < 0) {
+        perror("accept: ");
+        return -1;
+    }
+    store->current_n_conns += 1;
 
-    strftime(datestr, sizeof(datestr), "%Y-%m-%d %H:%M:%S", timeinfo);
-    printf("Formatted date string: %s\n", datestr);
+    REQ_STATE *state = new_state(client_fd, STATE_CLIENT); 
+    set_state(store, client_fd, state);
 
-    if(send(client_fd, datestr, strlen(datestr), 0) < 0) {
-        perror("send error");
-        close(client_fd);
-    } 
+    return client_fd;
 }
 
-int handle_input(STATE_STORE *ss, int client_fd) {
-    REQ_STATE *state = get_state(ss, client_fd);
+int handle_disconnected(STATE_STORE *state, struct pollfd *_, struct pollfd *pfd) {
+    close(pfd->fd);
+    pfd->fd = -1 * abs(pfd->fd);
+    state->current_n_conns -= 1;
+    return 0;
+}
+
+int handle_client_input(STATE_STORE *store, struct pollfd *_, struct pollfd *pfd) {
+    int client_fd = pfd->fd;
+    REQ_STATE *state = get_state(store, client_fd);
     if(state == NULL) {
         fprintf(stderr, "Invalid state: not initialized\n");
         return -1;
@@ -48,109 +68,87 @@ int handle_input(STATE_STORE *ss, int client_fd) {
         return -1;
     }
     
-    // Handle first time input event for clients
-    // Subsequent inputs from client will be ignored
-    if(state->type == STATE_CLIENT) {
-        // Read requested file path from fd
-        char path[110] = "assets/";
-        char buff[100];
-        int received;
-        
-        if((received = recv(client_fd, buff, 100, 0)) == 0) {
-            return 0;
-        }
+    char path[200] = "assets/";
+    int max_filename_len = 100;
+    char recv_buf[max_filename_len];
+    int received;
 
-        buff[received] = '\0';
-
-        strncat(path, buff, received);
-
-        printf("Opening: '%s'\n", path);
-
-        int fd = open(path, O_RDONLY | O_NONBLOCK, 0);
-        if(fd < 0) {
-            perror("open error");
-            return 0; 
-        }
-
-        // Initialize new state to track requested file for streaming
-        REQ_STATE *asset_state = new_state(fd, STATE_ASSET); 
-        asset_state->parent = state; 
-        asset_state->status = WAITING_INPUT;
-        set_state(ss, fd, asset_state);
-        state->status = WAITING_READ;
-
-        struct aiocb *aioctl = malloc(sizeof(struct aiocb));
-        char *buf = (char *) malloc(SERVER_READ_BUF_SIZE);
-        aioctl->aio_fildes = fd;
-        aioctl->aio_buf = buf;
-        aioctl->aio_nbytes = SERVER_READ_BUF_SIZE;
-        if(aio_read(aioctl) < 0) {
-            perror("aio_read: ");
-            return -1;
-        }
-
-        asset_state->aioctl = aioctl;
-
-        return fd;   
+    if((received = recv(client_fd, recv_buf, 100, 0)) == 0) {
+        return -1;
     }
 
-    if(state->type == STATE_ASSET) {
-        char *buf = (char *) state->aioctl->aio_buf;
-        int nread = state->aioctl->aio_nbytes;
+    strncat(path, recv_buf, received);
+    recv_buf[received] = '\0';
 
-        int stat = aio_error(state->aioctl);
-        if(stat == 0) {
-            nread = aio_return(state->aioctl);
-            if(nread == EOF) {
-                printf("reached EOF, closing fd...\n");
-                close(state->aioctl->aio_fildes); 
-                return 0;
-            }
-            buf[nread] = '\0';
-            printf("aio_read success: read %d bytes\n", nread);
-            printf("Data read: %s\n", buf);
+    printf("Opening: '%s'\n", path);
 
-            int client_fd = state->parent->conn_fd;
+    int fd = open(path, O_RDONLY | O_NONBLOCK, 0);
+    if(fd < 0) {
+        perror("open error");
+        return -1; 
+    }
 
-            struct aiocb *writectl = malloc(sizeof(struct aiocb));
-            writectl->aio_fildes = client_fd;
-            writectl->aio_buf = buf;
-            writectl->aio_nbytes = SERVER_READ_BUF_SIZE;
-            if(aio_write(writectl) < 0) {
-                perror("aio_write: ");
-                return -1;
-            }
+    // * Initialize new state to track requested file for streaming
+    REQ_STATE *asset_state = new_state(fd, STATE_ASSET); 
+    asset_state->parent = state; 
+    asset_state->status = WAITING_INPUT;
+    set_state(store, fd, asset_state);
+    state->status = PROCESSING;
 
-            if(aio_read(state->aioctl) < 0) {
-                perror("aio_read: ");
-                return -1;
-            }
+    struct aiocb *aioctl = malloc(sizeof(struct aiocb));
+    char *read_buf = (char *) malloc(SERVER_READ_BUF_SIZE);
+    aioctl->aio_fildes = fd;
+    aioctl->aio_buf = read_buf;
+    aioctl->aio_nbytes = SERVER_READ_BUF_SIZE;
+    if(aio_read(aioctl) < 0) {
+        perror("aio_read: ");
+        return -1;
+    }
 
-            return 1;
-        } else if(stat == EINPROGRESS) {
-            printf("aio_read hasn't completed\n");
-            return 1;
-        } else if(stat == ECANCELED) {
-            printf("aio_read has been canceled\n");
-        } else if(stat > 0) {
-            fprintf(stderr, "aio_read has failed: ");
-            if(stat == EINVAL) {
-                fprintf(stderr, "invalid aio control block");
-            } else if(stat == ENOSYS) {
-                fprintf(stderr, "aio_error is not implemented in this architecture");
-            } else {
-                fprintf(stderr, "unexpected failure");
-            }
-            printf("\n");
+    asset_state->aioctl = aioctl;
 
-            return -1;
-        } else {
-            printf("unexpected aio_read status\n");
-        }
-       
+    return fd; 
+}
+
+int handle_asset_input(STATE_STORE *store, struct pollfd *_, struct pollfd *pfd) {
+    int client_fd = pfd->fd;
+    REQ_STATE *state = get_state(store, client_fd);
+    if (state == NULL) {
+        return -1;
+    }
+
+    char *read_buf = (char *) state->aioctl->aio_buf;
+
+    int stat = aio_error(state->aioctl);
+    if(stat != 0) {
+        printf("aio_read not ready\n");
         return 0;
     }
+    int nread = aio_return(state->aioctl);
+    if(nread <= 0) {
+        printf("reached EOF, closing fd...\n");
+        close(state->aioctl->aio_fildes); 
+        return -1;
+    }
     
+    read_buf[nread] = '\0';
+    printf("aio_read success: read %d bytes\n", nread);
+
+    int parent_fd = state->parent->conn_fd;
+
+    printf("Writing to %d bytes to socket: %d\n", nread, parent_fd);
+    if(write(parent_fd, read_buf, nread) < 0) {
+        perror("write: ");
+        return -1;
+    }
+
+    // * Read more file content
+    state->aioctl->aio_offset += nread; 
+    if(aio_read(state->aioctl) < 0) {
+        perror("aio_read: ");
+        return -1;
+    }
+
     return 0;
 }
 
@@ -163,10 +161,4 @@ struct pollfd *build_pollfds(int numfds, int startfd, short events) {
     }
 
     return pollfds;
-}
-
-void handle_new_connection(STATE_STORE *ss, int conn_fd) {
-    REQ_STATE *state = new_state(conn_fd, STATE_CLIENT); 
-
-    set_state(ss, conn_fd, state);
 }
