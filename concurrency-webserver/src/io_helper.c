@@ -5,18 +5,21 @@ ssize_t readline(int fd, void *buf, size_t maxlen) {
     char *bufp = buf;
     int n;
     for (n = 0; n < maxlen - 1; n++) { // leave room at end for '\0'
-	int rc;
+        int rc;
         if ((rc = read_or_die(fd, &c, 1)) == 1) {
             *bufp++ = c;
-            if (c == '\n')
+            if (c == '\n') {
                 break;
+            }
         } else if (rc == 0) {
-            if (n == 1)
+            if (n == 1) {
                 return 0; /* EOF, no data read */
-            else
+            } else {
                 break;    /* EOF, some data was read */
-        } else
+            }
+        } else {
             return -1;    /* error */
+        }
     }
     *bufp = '\0';
     return n;
@@ -47,21 +50,21 @@ int open_client_fd(char *hostname, int port) {
 }
 
 int open_listen_fd(int port) {
-    // Create a socket descriptor 
+    // * Create a socket descriptor 
     int listen_fd;
     if ((listen_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-	fprintf(stderr, "socket() failed\n");
-	return -1;
+        fprintf(stderr, "socket() failed\n");
+        return -1;
     }
     
-    // Eliminates "Address already in use" error from bind
+    // * Eliminates "Address already in use" error from bind
     int optval = 1;
     if (setsockopt(listen_fd, SOL_SOCKET, SO_REUSEADDR, (const void *) &optval, sizeof(int)) < 0) {
-	fprintf(stderr, "setsockopt() failed\n");
-	return -1;
+        fprintf(stderr, "setsockopt() failed\n");
+        return -1;
     }
     
-    // Listen_fd will be an endpoint for all requests to port on any IP address for this host
+    // * listen_fd will be an endpoint for all requests to port on any IP address for this host
     struct sockaddr_in server_addr;
     bzero((char *) &server_addr, sizeof(server_addr));
     server_addr.sin_family = AF_INET; 
@@ -72,11 +75,12 @@ int open_listen_fd(int port) {
 	return -1;
     }
     
-    // Make it a listening socket ready to accept connection requests 
+    // * Make it a listening socket ready to accept connection requests 
     if (listen(listen_fd, 1024) < 0) {
-	fprintf(stderr, "listen() failed\n");
-	return -1;
+        fprintf(stderr, "listen() failed\n");
+        return -1;
     }
+
     return listen_fd;
 }
 
