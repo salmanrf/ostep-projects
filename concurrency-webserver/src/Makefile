@@ -3,15 +3,15 @@
 # To remove files, type "make clean"
 
 CC = gcc
-CFLAGS = -Wall
-OBJS = wserver.o wclient.o request.o io_helper.o 
+CFLAGS = -g -Wall
+OBJS = wserver.o wclient.o request.o io_helper.o queue.o
 
-.SUFFIXES: .c .o 
+.SUFFIXES: .c .o
 
 all: wserver wclient spin.cgi
 
-wserver: wserver.o request.o io_helper.o
-	$(CC) $(CFLAGS) -o wserver wserver.o request.o io_helper.o 
+wserver: wserver.o request.o io_helper.o queue.o
+	$(CC) $(CFLAGS) -o wserver wserver.o request.o io_helper.o queue.o
 
 wclient: wclient.o io_helper.o
 	$(CC) $(CFLAGS) -o wclient wclient.o io_helper.o
