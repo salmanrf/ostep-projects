@@ -25,6 +25,38 @@ ssize_t readline(int fd, void *buf, size_t maxlen) {
     return n;
 }
 
+int readnextline(int fd, char **lineptr, int *size) {
+    int currsize = 100;
+    char *temp = (char *) malloc(currsize);
+
+    int n = 0;
+    int ch = '\0';
+
+    while(read(fd, &ch, 1) != EOF) { 
+        if(n >= currsize) {
+            temp = (char *) realloc(temp, currsize + 100);
+            currsize += 100;
+        }
+
+        temp[n] = (char) ch;
+        n += 1;
+
+        if(ch == '\n') {
+            temp = realloc(temp, n);
+            temp[n] = '\0';
+
+            *lineptr = temp;
+            *size = n;
+
+            return 0;
+        }
+    }
+    
+    free(temp);
+
+    return -1;
+}
+
 
 int open_client_fd(char *hostname, int port) {
     int client_fd;

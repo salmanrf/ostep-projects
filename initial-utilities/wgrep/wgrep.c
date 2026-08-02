@@ -19,8 +19,8 @@ int main(int argc, char *argv[]) {
     file = stdin;
   } else {
     file = fopen(filepath, "r");
- }
- 
+  }
+
   if(file == NULL) {
     fprintf(stdout, "wgrep: cannot open file\n");
     exit(1);
@@ -50,20 +50,20 @@ int getnextline(char **lineptr, int *size, FILE *fp) {
     if(n >= currsize) {
         temp = (char *) realloc(temp, currsize + 100);
         currsize += 100;
-     }
+    }
 
-     temp[n] = (char) ch;
-     n += 1;
+    temp[n] = (char) ch;
+    n += 1;
 
-     if(ch == '\n') {
-       temp = realloc(temp, n);
-       temp[n] = '\0';
+    if(ch == '\n') {
+      temp = realloc(temp, n);
+      temp[n] = '\0';
 
-       *lineptr = temp;
-       *size = n;
+      *lineptr = temp;
+      *size = n;
 
-       return 0;
-     }
+      return 0;
+    }
   }
 
   free(temp);

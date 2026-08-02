@@ -4,6 +4,7 @@
 typedef struct queue_node {
 	void *data;
 	struct queue_node *next;
+	struct queue_node *prev;
 } queue_node_t;
 
 typedef struct queue {
@@ -20,4 +21,4 @@ int queue_size(queue_t *q);
 int queue_is_empty(queue_t *q);
 void queue_destroy(queue_t *q);
 
-#endif // __QUEUE_H__
+#endif

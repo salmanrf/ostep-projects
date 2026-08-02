@@ -85,6 +85,8 @@ ssize_t readline(int fd, void *buf, size_t maxlen);
 int open_client_fd(char *hostname, int portno);
 int open_listen_fd(int portno);
 
+int readnextline(int fd, char **lineptr, int *size);
+
 // wrappers for above
 #define readline_or_die(fd, buf, maxlen) \
     ({ ssize_t rc = readline(fd, buf, maxlen); assert(rc >= 0); rc; })
@@ -92,5 +94,7 @@ int open_listen_fd(int portno);
     ({ int rc = open_client_fd(hostname, port); assert(rc >= 0); rc; })
 #define open_listen_fd_or_die(port) \
     ({ int rc = open_listen_fd(port); assert(rc >= 0); rc; })
+
+int readnextline(int fd, char **lineptr, int *size);
 
 #endif // __IO_HELPER__

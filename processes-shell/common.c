@@ -59,7 +59,7 @@ ARGS *build_args(char *input, size_t len) {
     char *token = NULL;
     char *redir_path = NULL;
     ret->valid_redir = build_redir_path(prompt, &prompt, &redir_path);
- 
+
     char *cmd = NULL;
     if(!(cmd = strsep(&prompt, " ")) || strlen(cmd) == 0) {
         return ret;     
@@ -101,7 +101,7 @@ bool build_redir_path(char *prompt, char **new_prompt, char **redir_path) {
         *redir_path = NULL;
         return true; 
     }
-  
+
     // additional guard 
     if(token == NULL || strlen(token) >= initial_len) {
         *redir_path = NULL;
@@ -113,7 +113,7 @@ bool build_redir_path(char *prompt, char **new_prompt, char **redir_path) {
     char *path = str_trim_left(prompt, &newlen);
     if(newlen == 0) {
         *redir_path = NULL;
-         return false; 
+        return false; 
     }
 
     // check for invalid path (more than one)
@@ -166,7 +166,7 @@ char *str_trim_left(char *str, size_t *len) {
     if(str == NULL) {
         return str;
     }
- 
+
     int oldlen = *len;
     int start = 0;
 
