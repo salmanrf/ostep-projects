@@ -2,6 +2,7 @@
 #include "request.h"
 #include "io_helper.h"
 #include "queue.h"
+#include "linked_list.h"
 
 char default_root[] = ".";
 
@@ -12,6 +13,24 @@ pthread_mutex_t consumer_m = PTHREAD_MUTEX_INITIALIZER;
 
 int done = 0;
 
+int put_requests(queue_t *q, int conn_fd) {
+	Request *req = NULL;
+
+	if((req = init_request_metadata(conn_fd)) == NULL) {
+		return -1;
+	}
+
+	req->fd = conn_fd;
+	printf("method: '%s' uri: '%s' version:'%s'\n", req->Method, req->Path, req->Version);
+	get_req_args(req, conn_fd);
+
+	if(queue_enqueue(q, req) < 0) {
+		return -1;
+	}
+
+	return 0;
+}
+
 void *worker(void *args) {
 	queue_t *requests = (queue_t *) args;
 
@@ -21,10 +40,15 @@ void *worker(void *args) {
 			pthread_cond_wait(&requests_empty, &consumer_m);
 		}
 
-		int conn_fd = *((int *) queue_dequeue(requests));
-		request_handle(conn_fd);
-		close_or_die(conn_fd);
-		
+		Request *req = (Request *) queue_dequeue(requests);
+		int stat;
+		if((stat = request_handle(req)) < 0) {
+			printf("Error serving request \n");
+		} else {
+			printf("Request served successfully \n");
+		}
+		close(req->fd);
+
 		pthread_cond_signal(&requests_full);
 		pthread_mutex_unlock(&consumer_m);
 	}
@@ -48,7 +72,7 @@ int handle_requests(int server_fd, int num_threads) {
 			pthread_cond_wait(&requests_full, &producer_m);
 		}
 
-		queue_enqueue(requests, &conn_fd);
+		put_requests(requests, conn_fd);
 		pthread_cond_signal(&requests_empty);
 		pthread_mutex_unlock(&producer_m);
 	}

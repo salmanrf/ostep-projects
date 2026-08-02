@@ -1,5 +1,6 @@
 #include <stdlib.h>
 #include "queue.h"
+#include "request.h"
 
 queue_t *queue_create(void) {
 	queue_t *q = malloc(sizeof(queue_t));
@@ -19,16 +20,43 @@ int queue_enqueue(queue_t *q, void *data) {
 		return -1;
 	}
 	node->data = data;
+	node->prev = q->tail;
 	node->next = NULL;
 
 	if (q->tail == NULL) {
 		q->head = node;
 		q->tail = node;
-	} else {
-		q->tail->next = node;
-		q->tail = node;
+		q->size += 1;
+
+		return 0;
 	}
-	q->size++;
+
+	queue_node_t *q_node = node->prev;
+	Request *n_req = ((Request *) data);
+	Request *q_req = ((Request *) q_node->data);
+
+	while(q_node != NULL) {
+		int q_filesize = q_req->filestat->st_size;
+		int n_filesize = n_req->filestat->st_size;
+		if(n_filesize < q_filesize) {
+			q_node = q_node->prev;
+		}
+		break;
+	}
+
+	// * Reached head, becoming new head
+	if(q_node == NULL) {
+		node->prev = NULL;
+		node->next = q->head;
+		q->head = node;
+
+		return 0;
+	}
+
+	queue_node_t *old_next = q_node->next;
+	q_node->next = node;
+	node->next = old_next;
+
 	return 0;
 }
 
@@ -41,12 +69,17 @@ void *queue_dequeue(queue_t *q) {
 	queue_node_t *node = q->head;
 	void *data = node->data;
 
-	q->head = node->next;
+	queue_node_t *next_head = node->next;
+	
+	q->head = next_head;
 	if (q->head == NULL) {
+		// * Queue becomes empty
 		q->tail = NULL;
-
+	} else {
+		// * Queue not empty, first node has no prev
+		next_head->prev = NULL;
 	}
-	q->size--;
+	q->size -= 1;
 
 	free(node);
 	return data;
