@@ -1,0 +1,15 @@
+{
+  "name": "concurrency-pzip",
+  "version": "1.0.0",
+  "description": "In an earlier project, you implemented a simple compression tool based on run-length encoding, known simply as `zip`. Here, you'll implement something similar, except you'll use threads to make a parallel version of `zip`. We'll call this version ... wait for it ... `pzip`.",
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "create-input.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4"
+  }
+}
