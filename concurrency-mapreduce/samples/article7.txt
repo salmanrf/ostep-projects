@@ -1,0 +1,60 @@
+Octachloropropane
+
+Octachloropropane or perchloropropane is the chemical compound with elemental formula C3Cl8 and structural formula Cl3C−CCl2−CCl3. Its molecule has a simple chain of three carbon atoms connected by single bonds, with chlorine atoms filling their remaining bonds. It is a chlorocarbon, specifically the third simplest perchloroalkane (after carbon tetrachloride and hexachloroethane). It can be described as a derivative of propane C3H8, with all hydrogen atoms replaced by chlorine.
+Octachloropropane is a clear white crystalline solid at room temperature, with hexagonal crystal structure. It is easily deformed by mechanical stress, without losing its crystal structure, like a metal.
+
+
+== History ==
+Synthesis and characterization of octachloropropane was reported in 1875 by Krafft and Merz. Its remarkable crystal growth and deformation properties were noted by McCrone in 1949. Its use as a model for crystal deformation of minerals was pioneered by Win D. Means, Marc W. Jessel and others in the 1980s.
+
+
+== Production ==
+Octachloropropane can be obtained by reacting partially chlorinated propane with iodine trichloride (as in the original synthesis by Krafft and Merz), or with chlorine at high pressure or with activation by light. The temperature must be close to but below 200 °C, since at higher temperatures further reaction with chlorine gives carbon tetrachloride and hexachloroethane instead.
+
+
+== Chemistry ==
+Octachloropropane treated with aluminium in diethyl ether affords several unsaturated perchlorocarbons, by way of hexachloropropene (C3Cl6, Cl3C−CCl=CCl2). For instance,
+
+3 C3Cl8 + 2 Al → 2 AlCl3 + C3Cl6
+2 C3Cl6 + 4 Al → 4 AlCl3 + C6Cl8 (three isomers)
+2 C3Cl6 + 2 Al → 2 AlCl3 + C6Cl6 (two isomers)
+The products were identified as
+
+α-C6Cl6: colorless, m. p. 148 °C.
+β-C6Cl6: red, m. p. 155 °C
+with conjectured structures CCl≡C−CCl=CCl−CCl=CCl2 or CCl2=CCl−C≡C−CCl=CCl2, and 
+
+α-C6Cl8: b. p. 105-110 °C at 0.1 torr.
+β-C6Cl8: m. p. 71 °C.
+γ-C6Cl8: m. p. 183 °C.
+which were claimed to be cis/trans isomers and atropisomers of CCl2=CCl−CCl=CCl−CCl=CCl2 (octachloro(1,3,5)hexatriene).
+
+
+== Applications ==
+
+
+=== Crystalline plasticity model ===
+Octacholopropane is used by geologists and metallurgists as a model to study the plastic deformation of crystalline minerals and rocks under stress. The large individual crystalline grains (0.1-1.0 mm diameter) are distinguishable with a polarized light microscope at moderate magnification, and generally retain their size and approximate aspect ratio as the material undergoes shear strain. The grains will spontaneously arise from the quenched solid, in minutes or hours, even at room temperature.
+The material's flow driven by stress can be followed by embedding in it small amounts of fine inert particles, such as grit 1000 abrasives; the particles apparently do not affect the grain evolution and deformation. Camphor (with rhombohedral crystal structure) was previously proposed for this use.
+
+
+=== Metal separation ===
+Octachlorpropane reacts with niobium pentoxide and tantalum pentoxide at atmospheric pressure yielding the corresponding chlorides. It also reacts with titanium dioxide, if the other two oxides are present. This reaction, followed with distillation of the titanium tetrachloride at about 225 °C, could be an effective way to remove TiO2 from mixtures of those oxides.
+
+
+=== Pesticide ===
+Octachloropropane has been commercialized as a snail killer with the brand name HRS-1622, although it was not found to be very effective.
+Octachloropropane was found to be highly toxic to larvae of the housefly, with an efficiency comparable to decachlorobutane and hexachlorobenzene (BHC). Unlike the latter, it is somewhat volatile and thus effective even without physical contact with the solid.
+
+
+== Environmental concerns ==
+Octachloropropane was detected as a relatively minor item among dozens of highly chlorinated and perchlorinated hydrocarbons present as contaminants in the carbon tetrachloride produced from methanol by a plant in China, and also in the condensed waste from etching aluminium films in an integrated circuit factory.
+
+
+== See also ==
+Hexachloroethane
+Octafluoropropane
+Hexachlorocyclopropane
+
+
+== References ==
