@@ -2,13 +2,18 @@
 
 void *master(void *args);
 void *mapper(void *args);
+void *grouper(void *args);
 void *reducer(void *args);
+void *assigner(void *args);
 void init_partitions(int num_reducers);
-void init_workers(CONTEXT_T *ctx, int num_mappers);
+void init_workers(CONTEXT_T *ctx);
+void init_reducers(CONTEXT_T *ctx);
 
 CONTEXT_T *ctx = NULL;
 PARTITION_T **partitions = NULL;
 MAP_WORKER_T **map_workers = NULL;
+REDUCE_WORKER_T **reduce_workers = NULL;
+GROUPER_RESULT_T **group_results = NULL;
 int input_n = 0;
 char **input_filenames = NULL;
 
@@ -61,7 +66,53 @@ void *master(void *args) {
 		}
 	}
 
-	sleep(10);
+	int partition_count = ctx->n_reducers;
+
+	group_results = malloc(sizeof(void *) * partition_count);
+	pthread_t *grouper_ths = malloc(sizeof(pthread_t) * partition_count);
+	for (int i = 0; i < partition_count; i++) {
+		GROUPER_WORKER_T *args = malloc(sizeof(GROUPER_WORKER_T));
+		args->partition_key = i;
+		pthread_create(&grouper_ths[i], NULL, grouper, args);
+	}
+	for (int i = 0; i < partition_count; i++) {
+		pthread_join(grouper_ths[i], &group_results[i]);
+	}
+
+	// for (int i = 0; i < ctx->n_reducers; i++) {
+	// 	GROUPER_RESULT_T *result = results[0];
+	// 	GROUP_T **groups = result->groups;
+	// 	unsigned long group_count = result->groups_count;
+	// 	for (int j = 0; j < group_count; j++) {
+	// 		GROUP_T *group = groups[j];
+	// 		printf("Key: %s\n", group->key);
+	// 		printf("Values: %s\n", group->key);
+	// 		linked_list_t *values = group->values;
+	// 		list_node_t *node = values->head;
+	// 		while (node != NULL) {
+	// 			printf("%s\n", (char *)node->data);
+	// 			node = node->next;
+	// 		}
+	// 	}
+	// }
+
+	free(partitions);
+
+	init_reducers(ctx);
+
+	ASSIGNER_WORKER_T **assigners = malloc(sizeof(void *) * partition_count);
+	for (int i = 0; i < partition_count; i++) {
+		ASSIGNER_WORKER_T *args = malloc(sizeof(ASSIGNER_WORKER_T));
+		args->work_group_key = i;
+		args->work_group = group_results[i];
+		assigners[i] = args;
+
+		pthread_create(&args->th, NULL, assigner, args);
+	}
+
+	for (int i = 0; i < partition_count; i++) {
+		pthread_join(assigners[i]->th, NULL);
+	}
 
 	return NULL;
 }
@@ -96,12 +147,76 @@ void *mapper(void *args) {
 	return NULL;
 }
 
-void *reducer(void *args) {
-	// while () {
-	// }
+void *grouper(void *args) {
+	GROUPER_WORKER_T *w = args;
 
-	return NULL;
+	KV_T **data = partitions[w->partition_key]->data;
+	long data_len = partitions[w->partition_key]->curr_i + 1;
+
+	GROUPER_RESULT_T *result = malloc(sizeof(GROUPER_RESULT_T));
+	unsigned long result_len = 100;
+	GROUP_T **groups = malloc(sizeof(GROUP_T) * result_len);
+	unsigned long group_i = -1;
+
+	char *last_key = "";
+	for (int i = 0; i < data_len; i++) {
+		KV_T *kv = data[i];
+
+		if (strcmp(last_key, kv->key) != 0) {
+			group_i += 1;
+		}
+
+		if (group_i >= result_len) {
+			result_len += 100;
+			groups = realloc(groups, sizeof(GROUP_T) * result_len);
+			if (groups == NULL) {
+				perror("unable to grow groups storage");
+				exit(1);
+			}
+		}
+
+		GROUP_T *group = groups[group_i];
+		if (group == NULL) {
+			group = malloc(sizeof(GROUP_T));
+			group->key = strdup(data[i]->key);
+			group->values = list_create();
+			groups[group_i] = group;
+		}
+
+		linked_list_t *values = group->values;
+		list_node_t *node = malloc(sizeof(list_node_t));
+		node->data = strdup(data[i]->val);
+		list_push_back(values, node);
+
+		last_key = group->key;
+	}
+
+	result->groups = groups;
+	result->groups_count = group_i + 1;
+
+	return result;
 }
+
+char *get_next(char *key, int partition_number) {
+	GROUPER_RESULT_T *group = partitions[partition_number];
+}
+
+void *assigner(void *args) {
+	ASSIGNER_WORKER_T *worker = args;
+
+	pthread_mutex_lock(&ctx->reducer_q_m);
+	while (queue_is_empty(ctx->reducer_q)) {
+		pthread_cond_wait(&ctx->reducer_q_cond, &ctx->reducer_q_m);
+	}
+	REDUCE_WORKER_T *w = queue_dequeue(ctx->reducer_q);
+	printf("Got reduce worker %d\n", w->id);
+	w->input_ready = true;
+	pthread_mutex_unlock(&ctx->reducer_q_m);
+
+	pthread_cond_signal(&w->input_cond);
+}
+
+void *reducer(void *args) { return NULL; }
 
 void MR_Emit(char *key, char *value) {
 	if (strlen(key) == 0) {
@@ -113,11 +228,6 @@ void MR_Emit(char *key, char *value) {
 	}
 
 	unsigned long part_key = MR_DefaultHashPartition(key, ctx->n_reducers);
-
-	// static unsigned long n_call = 0;
-	// printf("Emit %lu, Key: '%s', Partition: %lu, Value: '%s'\n", n_call, key,
-	// 	   part_key, value);
-	// n_call++;
 
 	PARTITION_T *part = partitions[part_key];
 	pthread_mutex_lock(&part->part_m);
@@ -161,6 +271,12 @@ void MR_Run(int argc, char *argv[], Mapper map, int num_mappers, Reducer reduce,
 	pthread_mutex_init(&mapper_queue_m, NULL);
 	pthread_cond_init(&mapper_queue_cond, NULL);
 
+	pthread_mutex_t reducer_queue_m;
+	pthread_cond_t reducer_queue_cond;
+	queue_t *reducer_queue = queue_create();
+	pthread_mutex_init(&reducer_queue_m, NULL);
+	pthread_cond_init(&reducer_queue_cond, NULL);
+
 	input_n = argc - 1;
 	input_filenames = argv + 1;
 
@@ -168,6 +284,9 @@ void MR_Run(int argc, char *argv[], Mapper map, int num_mappers, Reducer reduce,
 	ctx->mapper_q = mapper_queue;
 	ctx->mapper_q_cond = mapper_queue_cond;
 	ctx->mapper_q_m = mapper_queue_m;
+	ctx->reducer_q = reducer_queue;
+	ctx->reducer_q_cond = reducer_queue_cond;
+	ctx->reducer_q_m = reducer_queue_m;
 	ctx->n_mappers = num_mappers;
 	ctx->n_reducers = num_reducers;
 	ctx->mapper_func = map;
@@ -178,7 +297,7 @@ void MR_Run(int argc, char *argv[], Mapper map, int num_mappers, Reducer reduce,
 	pthread_mutex_init(&ctx->map_ready_m, NULL);
 
 	init_partitions(num_reducers);
-	init_workers(ctx, num_mappers);
+	init_workers(ctx);
 
 	pthread_t master_th;
 	MASTER_WORKER_T *m = malloc(sizeof(MASTER_WORKER_T));
@@ -215,7 +334,7 @@ void init_partitions(int num_reducers) {
 	}
 }
 
-void init_workers(CONTEXT_T *ctx, int num_mappers) {
+void init_workers(CONTEXT_T *ctx) {
 	static bool _setup = false;
 	if (_setup) {
 		return;
@@ -225,6 +344,7 @@ void init_workers(CONTEXT_T *ctx, int num_mappers) {
 
 	printf("Initializing workers... \n");
 
+	int num_mappers = ctx->n_reducers;
 	map_workers = malloc(sizeof(void *) * num_mappers);
 	for (int i = 0; i < num_mappers; i++) {
 		MAP_WORKER_T *w = malloc(sizeof(MAP_WORKER_T));
@@ -237,5 +357,31 @@ void init_workers(CONTEXT_T *ctx, int num_mappers) {
 		pthread_create(&w->th, NULL, mapper, w);
 		map_workers[i] = w;
 		queue_enqueue(ctx->mapper_q, w);
+	}
+}
+
+void init_reducers(CONTEXT_T *ctx) {
+	static bool _setup = false;
+	if (_setup) {
+		return;
+	} else {
+		_setup = true;
+	}
+
+	printf("Initializing reducers... \n");
+
+	int num_reducers = ctx->n_reducers;
+	reduce_workers = malloc(sizeof(void *) * num_reducers);
+	for (int i = 0; i < num_reducers; i++) {
+		REDUCE_WORKER_T *w = malloc(sizeof(REDUCE_WORKER_T));
+		w->id = i;
+		w->status = IDLE;
+		w->input_ready = false;
+		pthread_cond_init(&w->input_cond, NULL);
+		pthread_mutex_init(&w->input_m, NULL);
+
+		pthread_create(&w->th, NULL, reducer, w);
+		reduce_workers[i] = w;
+		queue_enqueue(ctx->reducer_q, w);
 	}
 }

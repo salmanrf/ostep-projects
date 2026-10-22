@@ -16,15 +16,7 @@
 
 typedef enum { IDLE, BUSY, TERMINATED } WORKER_STATUS;
 
-// typedef struct PARTITION_SECT {
-// 	int max_size;
-// 	int curr_i;
-// 	KV_T *data;
-// 	pthread_mutex_t sect_m;
-// } PARTITION_SECT_T;
-
 typedef struct PARTITION {
-	// linked_list_t *sections;
 	unsigned long partition_key;
 	long max_size;
 	long end_i;
@@ -48,9 +40,31 @@ typedef struct MAP_WORKER {
 	pthread_t th;
 } MAP_WORKER_T;
 
+typedef struct GROUPER_WORKER {
+	int partition_key;
+} GROUPER_WORKER_T;
+
+typedef struct GROUP {
+	char *key;
+	linked_list_t *values;
+} GROUP_T;
+
+typedef struct GROUPER_RESULT {
+	GROUP_T **groups;
+	unsigned long groups_count;
+	unsigned long curr_i;
+} GROUPER_RESULT_T;
+
+typedef struct ASSIGNER_WORKER {
+	int work_group_key;
+	GROUPER_RESULT_T *work_group;
+	pthread_t th;
+} ASSIGNER_WORKER_T;
+
 typedef struct REDUCE_WORKER {
+	int id;
 	bool input_ready;
-	bool output_ready;
+	int *input_group_key;
 	WORKER_STATUS status;
 	pthread_cond_t input_cond;
 	pthread_mutex_t input_m;
@@ -60,9 +74,12 @@ typedef struct REDUCE_WORKER {
 typedef struct CONTEXT {
 	queue_t *mapper_q;
 	pthread_mutex_t mapper_q_m;
-	pthread_mutex_t map_ready_m;
 	pthread_cond_t mapper_q_cond;
 	pthread_cond_t map_ready_cond;
+	pthread_mutex_t map_ready_m;
+	queue_t *reducer_q;
+	pthread_mutex_t reducer_q_m;
+	pthread_cond_t reducer_q_cond;
 	int n_mappers;
 	int n_reducers;
 	Mapper mapper_func;
