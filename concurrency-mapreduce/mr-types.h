@@ -56,15 +56,16 @@ typedef struct GROUPER_RESULT {
 } GROUPER_RESULT_T;
 
 typedef struct ASSIGNER_WORKER {
-	int work_group_key;
-	GROUPER_RESULT_T *work_group;
+	int partition_key;
+	GROUPER_RESULT_T *partition_key_groups;
 	pthread_t th;
 } ASSIGNER_WORKER_T;
 
 typedef struct REDUCE_WORKER {
 	int id;
 	bool input_ready;
-	int *input_group_key;
+	int partition_number;
+	char *input_key;
 	WORKER_STATUS status;
 	pthread_cond_t input_cond;
 	pthread_mutex_t input_m;
@@ -76,7 +77,9 @@ typedef struct CONTEXT {
 	pthread_mutex_t mapper_q_m;
 	pthread_cond_t mapper_q_cond;
 	pthread_cond_t map_ready_cond;
+	pthread_cond_t reduce_ready_cond;
 	pthread_mutex_t map_ready_m;
+	pthread_mutex_t reduce_ready_m;
 	queue_t *reducer_q;
 	pthread_mutex_t reducer_q_m;
 	pthread_cond_t reducer_q_cond;
@@ -84,6 +87,8 @@ typedef struct CONTEXT {
 	int n_reducers;
 	Mapper mapper_func;
 	Reducer reducer_func;
+	Getter getter_func;
+	pthread_mutex_t ctx_m;
 	int input_files_count;
 	int finished_files_count;
 } CONTEXT_T;
