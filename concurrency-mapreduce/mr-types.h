@@ -6,6 +6,7 @@
 #include "mapreduce.h"
 #include "queue.h"
 #include <pthread.h>
+#include <semaphore.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -32,11 +33,6 @@ typedef struct MASTER_WORKER {
 
 typedef struct MAP_WORKER {
 	int id;
-	bool input_ready;
-	char *input_filename;
-	WORKER_STATUS status;
-	pthread_cond_t input_cond;
-	pthread_mutex_t input_m;
 	pthread_t th;
 } MAP_WORKER_T;
 
@@ -52,7 +48,6 @@ typedef struct GROUP {
 typedef struct GROUPER_RESULT {
 	GROUP_T **groups;
 	unsigned long groups_count;
-	unsigned long curr_i;
 } GROUPER_RESULT_T;
 
 typedef struct ASSIGNER_WORKER {
@@ -63,34 +58,20 @@ typedef struct ASSIGNER_WORKER {
 
 typedef struct REDUCE_WORKER {
 	int id;
-	bool input_ready;
-	int partition_number;
-	char *input_key;
-	WORKER_STATUS status;
-	pthread_cond_t input_cond;
-	pthread_mutex_t input_m;
+	int partition_i;
 	pthread_t th;
 } REDUCE_WORKER_T;
 
 typedef struct CONTEXT {
-	queue_t *mapper_q;
-	pthread_mutex_t mapper_q_m;
-	pthread_cond_t mapper_q_cond;
-	pthread_cond_t map_ready_cond;
-	pthread_cond_t reduce_ready_cond;
-	pthread_mutex_t map_ready_m;
-	pthread_mutex_t reduce_ready_m;
-	queue_t *reducer_q;
-	pthread_mutex_t reducer_q_m;
-	pthread_cond_t reducer_q_cond;
 	int n_mappers;
 	int n_reducers;
 	Mapper mapper_func;
 	Reducer reducer_func;
 	Getter getter_func;
 	pthread_mutex_t ctx_m;
-	int input_files_count;
-	int finished_files_count;
+	int map_files_count;
+	int map_files_i;
+	pthread_mutex_t map_files_m;
 } CONTEXT_T;
 
 #endif

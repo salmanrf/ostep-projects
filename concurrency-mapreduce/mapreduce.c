@@ -4,9 +4,8 @@ void *master(void *args);
 void *mapper(void *args);
 void *grouper(void *args);
 void *reducer(void *args);
-void *assigner(void *args);
 void init_partitions(int num_reducers);
-void init_workers(CONTEXT_T *ctx);
+void init_mappers(CONTEXT_T *ctx);
 void init_reducers(CONTEXT_T *ctx);
 
 CONTEXT_T *ctx = NULL;
@@ -17,39 +16,10 @@ GROUPER_RESULT_T **group_results = NULL;
 int input_n = 0;
 char **input_filenames = NULL;
 
-void *master(void *args) {
-	MASTER_WORKER_T *m = args;
-
-	for (int i = 0; i < input_n; i++) {
-		pthread_mutex_lock(&ctx->mapper_q_m);
-		while (queue_is_empty(ctx->mapper_q)) {
-			pthread_cond_wait(&ctx->mapper_q_cond, &ctx->mapper_q_m);
-		}
-		MAP_WORKER_T *w = queue_dequeue(ctx->mapper_q);
-		printf("Got map worker %d\n", w->id);
-		w->input_filename = input_filenames[i];
-		w->input_ready = true;
-		pthread_mutex_unlock(&ctx->mapper_q_m);
-
-		pthread_cond_signal(&w->input_cond);
-	}
-
-	while (m->status != TERMINATED) {
-		pthread_mutex_lock(&ctx->map_ready_m);
-		while (ctx->finished_files_count < ctx->input_files_count) {
-			pthread_cond_wait(&ctx->map_ready_cond, &ctx->map_ready_m);
-			ctx->finished_files_count += 1;
-		}
-		printf("Map step finished\n");
-		pthread_mutex_unlock(&ctx->map_ready_m);
-		break;
-	}
-
+void *master(void *_) {
+	init_mappers(ctx);
 	for (int i = 0; i < ctx->n_mappers; i++) {
-		MAP_WORKER_T *mp = map_workers[i];
-		mp->status = TERMINATED;
-		mp->input_ready = true;
-		pthread_cond_signal(&mp->input_cond);
+		pthread_join(map_workers[i]->th, NULL);
 	}
 
 	printf("Starting intermediate kv pairs sort\n");
@@ -77,22 +47,9 @@ void *master(void *args) {
 	free(partitions);
 
 	init_reducers(ctx);
-
-	ASSIGNER_WORKER_T **assigners = malloc(sizeof(void *) * partition_count);
-	for (int i = 0; i < partition_count; i++) {
-		ASSIGNER_WORKER_T *args = malloc(sizeof(ASSIGNER_WORKER_T));
-		args->partition_key = i;
-		args->partition_key_groups = group_results[i];
-		assigners[i] = args;
-
-		pthread_create(&args->th, NULL, assigner, args);
+	for (int i = 0; i < ctx->n_reducers; i++) {
+		pthread_join(reduce_workers[i]->th, NULL);
 	}
-
-	pthread_mutex_lock(&ctx->reduce_ready_m);
-	while (queue_size(ctx->reducer_q) < ctx->n_reducers) {
-		pthread_cond_wait(&ctx->reduce_ready_cond, &ctx->reduce_ready_m);
-	}
-	pthread_mutex_unlock(&ctx->reduce_ready_m);
 
 	return NULL;
 }
@@ -102,26 +59,18 @@ void *mapper(void *args) {
 
 	printf("Map worker %d spawned\n", w->id);
 
-	while (w->status != TERMINATED) {
-		pthread_mutex_lock(&w->input_m);
-		while (!w->input_ready) {
-			pthread_cond_wait(&w->input_cond, &w->input_m);
+	while (1) {
+		pthread_mutex_lock(&ctx->map_files_m);
+		if (ctx->map_files_i > ctx->map_files_count - 1) {
+			pthread_mutex_unlock(&ctx->map_files_m);
+			break;
 		}
-		if (w->status == TERMINATED) {
-			printf("Map worker %d is terminating\n", w->id);
-			return NULL;
-		}
-		w->input_ready = false;
-		w->status = BUSY;
-		pthread_mutex_unlock(&w->input_m);
+		int i = ctx->map_files_i++;
+		char *input_filename = strdup(input_filenames[i]);
+		pthread_mutex_unlock(&ctx->map_files_m);
 
-		ctx->mapper_func(w->input_filename);
-		pthread_mutex_lock(&ctx->mapper_q_m);
-		w->status = IDLE;
-		queue_enqueue(ctx->mapper_q, w);
-		pthread_cond_signal(&ctx->mapper_q_cond);
-		pthread_cond_signal(&ctx->map_ready_cond);
-		pthread_mutex_unlock(&ctx->mapper_q_m);
+		ctx->mapper_func(input_filename);
+		free(input_filename);
 	}
 
 	return NULL;
@@ -187,53 +136,15 @@ char *get_next(char *key, int partition_number) {
 	return NULL;
 }
 
-void *assigner(void *args) {
-	ASSIGNER_WORKER_T *worker = args;
-
-	for (int i = 0; i < worker->partition_key_groups->groups_count; i++) {
-		pthread_mutex_lock(&ctx->reducer_q_m);
-		while (queue_is_empty(ctx->reducer_q)) {
-			pthread_cond_wait(&ctx->reducer_q_cond, &ctx->reducer_q_m);
-		}
-		REDUCE_WORKER_T *r = queue_dequeue(ctx->reducer_q);
-		pthread_mutex_unlock(&ctx->reducer_q_m);
-
-		pthread_mutex_lock(&r->input_m);
-		r->input_key = worker->partition_key_groups->groups[i]->key;
-		r->input_ready = true;
-		r->partition_number = worker->partition_key;
-		pthread_cond_signal(&r->input_cond);
-		pthread_mutex_unlock(&r->input_m);
-	}
-
-	return NULL;
-}
-
 void *reducer(void *args) {
 	REDUCE_WORKER_T *w = args;
 
 	printf("Reduce worker %d spawned\n", w->id);
 
-	while (w->status != TERMINATED) {
-		pthread_mutex_lock(&w->input_m);
-		while (!w->input_ready) {
-			pthread_cond_wait(&w->input_cond, &w->input_m);
-		}
-		if (w->status == TERMINATED) {
-			printf("Map worker %d is terminating\n", w->id);
-			return NULL;
-		}
-		w->input_ready = false;
-		w->status = BUSY;
-		pthread_mutex_unlock(&w->input_m);
-
-		ctx->reducer_func(w->input_key, ctx->getter_func, w->partition_number);
-		pthread_mutex_lock(&ctx->reducer_q_m);
-		w->status = IDLE;
-		queue_enqueue(ctx->reducer_q, w);
-		pthread_cond_signal(&ctx->reducer_q_cond);
-		pthread_cond_signal(&ctx->reduce_ready_cond);
-		pthread_mutex_unlock(&ctx->reducer_q_m);
+	GROUPER_RESULT_T *gr = group_results[w->partition_i];
+	for (unsigned long i = 0; i < gr->groups_count; i++) {
+		GROUP_T *g = gr->groups[i];
+		ctx->reducer_func(g->key, ctx->getter_func, w->partition_i);
 	}
 
 	return NULL;
@@ -286,51 +197,27 @@ void MR_Run(int argc, char *argv[], Mapper map, int num_mappers, Reducer reduce,
 		exit(1);
 	}
 
-	pthread_mutex_t mapper_queue_m;
-	pthread_cond_t mapper_queue_cond;
-	queue_t *mapper_queue = queue_create();
-	pthread_mutex_init(&mapper_queue_m, NULL);
-	pthread_cond_init(&mapper_queue_cond, NULL);
-
-	pthread_mutex_t reducer_queue_m;
-	pthread_cond_t reducer_queue_cond;
-	queue_t *reducer_queue = queue_create();
-	pthread_mutex_init(&reducer_queue_m, NULL);
-	pthread_cond_init(&reducer_queue_cond, NULL);
-
 	input_n = argc - 1;
 	input_filenames = argv + 1;
 
 	ctx = malloc(sizeof(CONTEXT_T));
-	ctx->mapper_q = mapper_queue;
-	ctx->mapper_q_cond = mapper_queue_cond;
-	ctx->mapper_q_m = mapper_queue_m;
-	ctx->reducer_q = reducer_queue;
-	ctx->reducer_q_cond = reducer_queue_cond;
-	ctx->reducer_q_m = reducer_queue_m;
 	ctx->n_mappers = num_mappers;
 	ctx->n_reducers = num_reducers;
 	ctx->mapper_func = map;
 	ctx->reducer_func = reduce;
 	ctx->getter_func = get_next;
-	ctx->input_files_count = input_n;
-	ctx->finished_files_count = 0;
-	pthread_cond_init(&ctx->map_ready_cond, NULL);
-	pthread_mutex_init(&ctx->map_ready_m, NULL);
-	pthread_cond_init(&ctx->reduce_ready_cond, NULL);
-	pthread_mutex_init(&ctx->reduce_ready_m, NULL);
+	ctx->map_files_count = input_n;
+	ctx->map_files_i = 0;
+	pthread_mutex_init(&ctx->map_files_m, NULL);
 	pthread_mutex_init(&ctx->ctx_m, NULL);
 
 	init_partitions(num_reducers);
-	init_workers(ctx);
 
 	pthread_t master_th;
 	MASTER_WORKER_T *m = malloc(sizeof(MASTER_WORKER_T));
 	m->status = IDLE;
 	pthread_create(&master_th, NULL, master, m);
 	m->th = master_th;
-
-	pthread_cond_signal(&ctx->mapper_q_cond);
 
 	pthread_join(m->th, NULL);
 }
@@ -359,7 +246,7 @@ void init_partitions(int num_reducers) {
 	}
 }
 
-void init_workers(CONTEXT_T *ctx) {
+void init_mappers(CONTEXT_T *ctx) {
 	static bool _setup = false;
 	if (_setup) {
 		return;
@@ -367,21 +254,16 @@ void init_workers(CONTEXT_T *ctx) {
 		_setup = true;
 	}
 
-	printf("Initializing workers... \n");
+	printf("Initializing mappers... \n");
 
-	int num_mappers = ctx->n_reducers;
+	int num_mappers = ctx->n_mappers;
 	map_workers = malloc(sizeof(void *) * num_mappers);
 	for (int i = 0; i < num_mappers; i++) {
 		MAP_WORKER_T *w = malloc(sizeof(MAP_WORKER_T));
 		w->id = i;
-		w->status = IDLE;
-		w->input_ready = false;
-		pthread_cond_init(&w->input_cond, NULL);
-		pthread_mutex_init(&w->input_m, NULL);
 
 		pthread_create(&w->th, NULL, mapper, w);
 		map_workers[i] = w;
-		queue_enqueue(ctx->mapper_q, w);
 	}
 }
 
@@ -400,13 +282,9 @@ void init_reducers(CONTEXT_T *ctx) {
 	for (int i = 0; i < num_reducers; i++) {
 		REDUCE_WORKER_T *w = malloc(sizeof(REDUCE_WORKER_T));
 		w->id = i;
-		w->status = IDLE;
-		w->input_ready = false;
-		pthread_cond_init(&w->input_cond, NULL);
-		pthread_mutex_init(&w->input_m, NULL);
+		w->partition_i = i;
 
 		pthread_create(&w->th, NULL, reducer, w);
 		reduce_workers[i] = w;
-		queue_enqueue(ctx->reducer_q, w);
 	}
 }
