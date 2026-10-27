@@ -1,0 +1,1 @@
+./wordcount tests/4.in tests/4.in tests/4.in | LC_ALL=C sort
