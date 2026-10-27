@@ -22,8 +22,6 @@ void *master(void *_) {
 		pthread_join(map_workers[i]->th, NULL);
 	}
 
-	printf("Starting intermediate kv pairs sort\n");
-
 	for (int i = 0; i < ctx->n_reducers; i++) {
 		PARTITION_T *part = partitions[i];
 
@@ -55,10 +53,6 @@ void *master(void *_) {
 }
 
 void *mapper(void *args) {
-	MAP_WORKER_T *w = args;
-
-	printf("Map worker %d spawned\n", w->id);
-
 	while (1) {
 		pthread_mutex_lock(&ctx->map_files_m);
 		if (ctx->map_files_i > ctx->map_files_count - 1) {
@@ -138,8 +132,6 @@ char *get_next(char *key, int partition_number) {
 
 void *reducer(void *args) {
 	REDUCE_WORKER_T *w = args;
-
-	printf("Reduce worker %d spawned\n", w->id);
 
 	GROUPER_RESULT_T *gr = group_results[w->partition_i];
 	for (unsigned long i = 0; i < gr->groups_count; i++) {
@@ -230,8 +222,6 @@ void init_partitions(int num_reducers) {
 		_setup = true;
 	}
 
-	printf("Initializing partitions... \n");
-
 	partitions = malloc(sizeof(void *) * num_reducers);
 	for (int i = 0; i < num_reducers; i++) {
 		PARTITION_T *part = malloc(sizeof(PARTITION_T));
@@ -254,8 +244,6 @@ void init_mappers(CONTEXT_T *ctx) {
 		_setup = true;
 	}
 
-	printf("Initializing mappers... \n");
-
 	int num_mappers = ctx->n_mappers;
 	map_workers = malloc(sizeof(void *) * num_mappers);
 	for (int i = 0; i < num_mappers; i++) {
@@ -274,8 +262,6 @@ void init_reducers(CONTEXT_T *ctx) {
 	} else {
 		_setup = true;
 	}
-
-	printf("Initializing reducers... \n");
 
 	int num_reducers = ctx->n_reducers;
 	reduce_workers = malloc(sizeof(void *) * num_reducers);

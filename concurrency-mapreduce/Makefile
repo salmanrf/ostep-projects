@@ -39,5 +39,6 @@ $(BINS): %: %.o $(LIB_OBJS)
 
 clean:
 	rm -f $(BINS) $(DEBUG_BINS) $(OBJS) $(DEPS) $(DEBUG_OBJS) $(DEBUG_DEPS)
+	rm -rf tests-out
 
 .PHONY: all debug clean

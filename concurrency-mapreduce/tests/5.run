@@ -1,0 +1,1 @@
+./wordcount samples/article*.txt | LC_ALL=C sort
